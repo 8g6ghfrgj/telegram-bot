@@ -18,6 +18,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+print("=" * 50)
+print("🚀 STARTING TELEGRAM BOT SERVER")
+print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
+print("=" * 50)
+
 # كود Keep-Alive
 app = Flask(__name__)
 
@@ -32,8 +37,10 @@ def health():
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
-# بدء الخادم
-Thread(target=run_flask, daemon=True).start()
+# بدء خادم Flask في thread منفصل
+flask_thread = Thread(target=run_flask, daemon=True)
+flask_thread.start()
+print("✅ Flask server started")
 
 class BotDatabase:
     def __init__(self):
@@ -103,6 +110,7 @@ class BotHandler:
             reply_markup=reply_markup,
             parse_mode='Markdown'
         )
+        print(f"✅ User {user_id} used /start command")
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         query = update.callback_query
@@ -121,6 +129,8 @@ class BotHandler:
             await self.start_from_query(query, context)
         else:
             await query.edit_message_text("🛠 **قيد التطوير**\n\nهذه الميزة قيد التطوير حالياً...", parse_mode='Markdown')
+        
+        print(f"✅ User {user_id} pressed button: {data}")
     
     async def start_from_query(self, query, context):
         keyboard = [
@@ -143,41 +153,38 @@ class BotHandler:
         self.application = Application.builder().token(BOT_TOKEN).build()
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
+        print("✅ Telegram bot handlers setup completed")
     
     def run(self):
-        print("🤖 Starting Telegram Bot...")
-        self.application.run_polling()
-        print("✅ Bot started successfully")
+        print("🤖 Starting Telegram Bot polling...")
+        self.application.run_polling(drop_pending_updates=True)
+        print("❌ Telegram Bot stopped (this shouldn't happen)")
 
-def main():
-    print("=" * 50)
-    print("🚀 STARTING TELEGRAM BOT SERVER")
-    print("✅ Keep-Alive server started")
-    print(f"🤖 Bot Token: {BOT_TOKEN[:10]}...")
-    print("=" * 50)
-    
+def start_bot():
+    """تشغيل البوت في thread منفصل"""
     try:
         bot = BotHandler()
-        
-        # بدء البوت في thread منفصل
-        def run_bot():
-            bot.run()
-        
-        bot_thread = threading.Thread(target=run_bot, daemon=True)
-        bot_thread.start()
-        
-        print("✅ Telegram Bot thread started")
-        
-        # ابقاء البرنامج الرئيسي يعمل
-        while True:
-            time.sleep(60)
-            print("🟢 Main server is alive...")
-            
+        bot.run()
     except Exception as e:
-        print(f"❌ Error: {e}")
-        while True:
-            print("🔵 Server is still alive...")
-            time.sleep(60)
+        print(f"❌ Error in bot thread: {e}")
+        # إعادة المحاولة بعد 10 ثواني
+        time.sleep(10)
+        start_bot()
+
+def main():
+    print("🚀 Starting main server process...")
+    
+    # بدء البوت في thread منفصل
+    bot_thread = threading.Thread(target=start_bot, daemon=True)
+    bot_thread.start()
+    print("✅ Telegram Bot thread started")
+    
+    # ابقاء البرنامج الرئيسي يعمل
+    counter = 0
+    while True:
+        print(f"🟢 Main server running... ({counter}) - Bot should be receiving messages")
+        counter += 1
+        time.sleep(30)
 
 if __name__ == "__main__":
     main()
